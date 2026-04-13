@@ -1,0 +1,22 @@
+services:
+  printer-flush:
+    build: .
+    container_name: printer-flush
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/data          # flush PDF + last_print.json state
+      - ./.env:/app/.env      # writable so web UI can persist interval changes
+    ports:
+      - "${PORT:-7841}:5000"  # web UI
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
