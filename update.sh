@@ -6,7 +6,7 @@ set -e
 WD="$(cd "$(dirname "$0")" && pwd)"
 
 echo "Pulling latest code..."
-git -C "${WD}" pull origin
+git -C "${WD}" pull
 
 echo "Rebuilding and restarting container..."
 sh "${WD}/restart_container.sh" "${1:-}"
