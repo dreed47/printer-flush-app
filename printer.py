@@ -5,8 +5,10 @@ Sends a color flush PDF to a network printer on a configurable interval via IPP.
 No CUPS required — prints directly over the network.
 """
 
+import io
 import os
 import re
+import socket
 import struct
 import subprocess
 import tempfile
@@ -20,6 +22,7 @@ from pathlib import Path
 import requests
 import schedule
 from flask import Flask, jsonify, request as flask_request
+from PIL import Image, ImageDraw, ImageFont
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 LOG_BUFFER: deque = deque(maxlen=500)
@@ -117,6 +120,78 @@ def pdf_to_jpeg(pdf_path: Path) -> bytes | None:
             pass
 
 
+def _get_local_ip() -> str:
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        return s.getsockname()[0]
+    except Exception:
+        return "unknown"
+    finally:
+        s.close()
+
+
+def _overlay_stats(jpeg_bytes: bytes) -> bytes:
+    """Stamp app name, tagline, date, and local IP onto the bottom of the JPEG."""
+    now = datetime.now()
+    line_title    = "🖨️  Printer Flush"
+    line_tagline  = "Keeping your nozzles wet since the dawn of inkjet."
+    line_date     = now.strftime("%A, %B %-d %Y")
+    line_detail   = f"{now.strftime('%I:%M %p')}  ·  {_get_local_ip()}:{WEB_PORT}"
+
+    img = Image.open(io.BytesIO(jpeg_bytes)).convert("RGB")
+    draw = ImageDraw.Draw(img)
+
+    try:
+        font_large  = ImageFont.load_default(size=56)
+        font_medium = ImageFont.load_default(size=38)
+        font_small  = ImageFont.load_default(size=32)
+    except TypeError:
+        font_large = font_medium = font_small = ImageFont.load_default()
+
+    padding  = 30
+    line_gap = 10
+
+    def text_h(text, font):
+        bb = draw.textbbox((0, 0), text, font=font)
+        return bb[3] - bb[1], bb[2] - bb[0]
+
+    h_title,   w_title   = text_h(line_title,   font_large)
+    h_tagline, w_tagline = text_h(line_tagline, font_medium)
+    h_date,    w_date    = text_h(line_date,    font_small)
+    h_detail,  w_detail  = text_h(line_detail,  font_small)
+
+    block_h = h_title + line_gap + h_tagline + line_gap * 2 + h_date + line_gap + h_detail + padding * 2
+    block_w = max(w_title, w_tagline, w_date, w_detail) + padding * 2
+
+    x = padding
+    y = img.height - block_h - padding
+
+    # Semi-transparent background box
+    overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    overlay_draw = ImageDraw.Draw(overlay)
+    overlay_draw.rectangle(
+        [x - padding // 2, y - padding // 2,
+         x + block_w, y + block_h],
+        fill=(0, 0, 0, 170)
+    )
+    img = Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB")
+    draw = ImageDraw.Draw(img)
+
+    cy = y
+    draw.text((x, cy), line_title,   font=font_large,  fill=(255, 255, 255))
+    cy += h_title + line_gap
+    draw.text((x, cy), line_tagline, font=font_medium, fill=(160, 210, 255))
+    cy += h_tagline + line_gap * 2
+    draw.text((x, cy), line_date,    font=font_small,  fill=(220, 220, 220))
+    cy += h_date + line_gap
+    draw.text((x, cy), line_detail,  font=font_small,  fill=(150, 150, 150))
+
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=95)
+    return buf.getvalue()
+
+
 def print_flush_page() -> bool:
     """Convert the flush PDF to JPEG and send it to the printer via IPP."""
     pdf_path = Path(FLUSH_PDF)
@@ -128,7 +203,10 @@ def print_flush_page() -> bool:
     jpeg_data = pdf_to_jpeg(pdf_path)
     if not jpeg_data:
         return False
-    log.info(f"Converted — {len(jpeg_data) // 1024} KB JPEG ready")
+
+    log.info("Overlaying print stats onto page…")
+    jpeg_data = _overlay_stats(jpeg_data)
+    log.info(f"Ready — {len(jpeg_data) // 1024} KB JPEG with stats")
 
     ipp_body = build_print_job_request(PRINTER_URI, jpeg_data, doc_format=b"image/jpeg")
 
