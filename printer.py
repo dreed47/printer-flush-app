@@ -307,6 +307,11 @@ _HTML = """<!doctype html>
   #btn-clear { background: #444; color: #ccc; }
   #status    { font-size: 12px; color: #888; }
   #last-print { font-size: 12px; color: #5c9e5c; }
+  header.manual-mode { background: #1e1608 !important; border-bottom-color: #b8860b; }
+  #manual-badge { display:none; font-size:11px; font-weight:bold; color:#f0a500;
+                  background:#3a2a00; border:1px solid #b8860b; border-radius:4px;
+                  padding:3px 8px; letter-spacing:.05em; }
+  header.manual-mode #manual-badge { display:inline; }
   #log { padding: 10px 16px; height: calc(100vh - 50px); overflow-y: auto;
          white-space: pre-wrap; word-break: break-all; }
   .INFO    { color: #d4d4d4; }
@@ -318,6 +323,7 @@ _HTML = """<!doctype html>
 <body>
 <header>
   <h1>🖨️ Printer Flush</h1>
+  <span id="manual-badge">⏸ SCHEDULER DISABLED</span>
   <span id="last-print">Last print: loading…</span>
   <span id="status">connecting…</span>
   <label>Interval
@@ -347,10 +353,16 @@ _HTML = """<!doctype html>
       const r = await fetch('/config');
       const d = await r.json();
       selInt.value = String(d.run_interval_days);
+      updateHeaderStyle();
     } catch(e) {}
   }
 
+  function updateHeaderStyle() {
+    document.querySelector('header').classList.toggle('manual-mode', parseInt(selInt.value) === 0);
+  }
+
   async function saveConfig() {
+    updateHeaderStyle();
     await fetch('/config', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
