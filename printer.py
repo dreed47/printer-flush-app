@@ -52,6 +52,7 @@ RUN_INTERVAL_DAYS= int(os.getenv("RUN_INTERVAL_DAYS", "10"))
 ENV_FILE         = os.getenv("ENV_FILE", "/app/.env")
 STATE_FILE       = Path(os.getenv("STATE_FILE", "/data/last_print.json"))
 WEB_PORT         = int(os.getenv("PORT", "7841"))
+TAGLINE          = os.getenv("TAGLINE", "Keeping your nozzles wet since the dawn of inkjet.")
 
 PRINTER_URI = f"ipp://{PRINTER_IP}:{PRINTER_PORT}{PRINTER_PATH}"
 PRINTER_URL = f"http://{PRINTER_IP}:{PRINTER_PORT}{PRINTER_PATH}"
@@ -135,7 +136,7 @@ def _overlay_stats(jpeg_bytes: bytes) -> bytes:
     """Stamp app name, tagline, date, and local IP onto the bottom of the JPEG."""
     now = datetime.now()
     line_title    = "🖨️  Printer Flush"
-    line_tagline  = "Keeping your nozzles wet since the dawn of inkjet."
+    line_tagline  = TAGLINE
     line_date     = now.strftime("%A, %B %-d %Y")
     line_detail   = f"{now.strftime('%I:%M %p')}  ·  {_get_local_ip()}:{WEB_PORT}"
 
