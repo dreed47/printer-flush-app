@@ -51,6 +51,7 @@ cp .env.example .env   # or edit .env directly
 | `FLUSH_PDF` | `/data/printer-color-flush.pdf` | Path to the flush PDF inside the container |
 | `RUN_INTERVAL_DAYS` | `10` | Days between automatic flushes (`0` = manual only) |
 | `PORT` | `7841` | Host port for the web UI |
+| `TZ` | `America/Chicago` | Container timezone — set to your local zone for correct timestamps |
 | `TAGLINE` | `Keeping your nozzles wet since the dawn of inkjet.` | Tagline printed on the flush page |
 
 **4. Start the container**

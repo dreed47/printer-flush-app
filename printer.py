@@ -257,7 +257,11 @@ def _load_last_print() -> str:
         if STATE_FILE.exists():
             data = STATE_FILE.read_text()
             import json
-            return json.loads(data).get("last_print", "Never")
+            raw = json.loads(data).get("last_print", "Never")
+            if raw and raw != "Never":
+                dt = datetime.strptime(raw, "%Y-%m-%d %H:%M:%S")
+                return dt.strftime("%b %-d, %I:%M %p").replace(" 0", " ")
+            return raw
     except Exception:
         pass
     return "Never"
