@@ -285,7 +285,7 @@ _HTML = """<!doctype html>
 <head>
 <meta charset="utf-8">
 <title>Printer Flush</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🖨️</text></svg>">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='2' y='7' width='20' height='11' rx='2' fill='%23334'/%3E%3Crect x='6' y='2' width='12' height='6' rx='1' fill='%237eb8f7'/%3E%3Crect x='6' y='13' width='12' height='6' rx='1' fill='%23556'/%3E%3Ccircle cx='17' cy='11' r='1.5' fill='%234caf50'/%3E%3C/svg%3E">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #0f0f0f; color: #d4d4d4; font-family: monospace; font-size: 13px; }
