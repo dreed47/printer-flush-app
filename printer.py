@@ -478,6 +478,9 @@ if __name__ == "__main__":
     if RUN_INTERVAL_DAYS > 0:
         log.info(f"Scheduling flush every {RUN_INTERVAL_DAYS} day(s)")
         schedule.every(RUN_INTERVAL_DAYS).days.do(run)
-        while True:
-            schedule.run_pending()
-            time.sleep(60)
+    else:
+        log.info("Schedule disabled — manual flush only")
+
+    while True:
+        schedule.run_pending()
+        time.sleep(60)
