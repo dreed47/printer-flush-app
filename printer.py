@@ -328,6 +328,7 @@ _HTML = """<!doctype html>
   <span id="status">connecting…</span>
   <label>Interval
     <select id="sel-interval" onchange="saveConfig()">
+      <option value="-10">Every 10 min (test)</option>
       <option value="1">Every 1 day</option>
       <option value="5">Every 5 days</option>
       <option value="7">Every 7 days</option>
@@ -449,7 +450,10 @@ def _set_config():
         RUN_INTERVAL_DAYS = val
         _update_env_file("RUN_INTERVAL_DAYS", str(val))
         schedule.clear()
-        if val > 0:
+        if val == -10:
+            schedule.every(10).minutes.do(run)
+            log.info("Schedule updated — flushing every 10 minutes (test mode)")
+        elif val > 0:
             schedule.every(val).days.do(run)
             log.info(f"Schedule updated — flushing every {val} day(s)")
         else:
@@ -475,7 +479,10 @@ if __name__ == "__main__":
     threading.Thread(target=_start_web, daemon=True).start()
     log.info(f"Web UI available at http://localhost:{WEB_PORT}")
 
-    if RUN_INTERVAL_DAYS > 0:
+    if RUN_INTERVAL_DAYS == -10:
+        log.info("Scheduling flush every 10 minutes (test mode)")
+        schedule.every(10).minutes.do(run)
+    elif RUN_INTERVAL_DAYS > 0:
         log.info(f"Scheduling flush every {RUN_INTERVAL_DAYS} day(s)")
         schedule.every(RUN_INTERVAL_DAYS).days.do(run)
     else:
