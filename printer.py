@@ -267,6 +267,22 @@ def _load_last_print() -> str:
     return "Never"
 
 
+# ── Overdue check ────────────────────────────────────────────────────────────
+def _is_overdue() -> bool:
+    """Return True if a flush is overdue based on last_print.json."""
+    import json
+    from datetime import timedelta
+    try:
+        if STATE_FILE.exists():
+            raw = json.loads(STATE_FILE.read_text()).get("last_print")
+            if raw and raw != "Never":
+                last = datetime.strptime(raw, "%Y-%m-%d %H:%M:%S")
+                return datetime.now() >= last + timedelta(days=RUN_INTERVAL_DAYS)
+    except Exception:
+        pass
+    return True  # never printed — run now
+
+
 # ── Main run ──────────────────────────────────────────────────────────────────
 def run():
     log.info("━" * 60)
@@ -456,6 +472,9 @@ def _set_config():
         elif val > 0:
             schedule.every(val).days.do(run)
             log.info(f"Schedule updated — flushing every {val} day(s)")
+            if _is_overdue():
+                log.info("Overdue flush detected after config change — running now")
+                threading.Thread(target=run, daemon=True).start()
         else:
             log.info("Schedule cleared — manual only")
     return jsonify({"run_interval_days": RUN_INTERVAL_DAYS})
@@ -485,6 +504,9 @@ if __name__ == "__main__":
     elif RUN_INTERVAL_DAYS > 0:
         log.info(f"Scheduling flush every {RUN_INTERVAL_DAYS} day(s)")
         schedule.every(RUN_INTERVAL_DAYS).days.do(run)
+        if _is_overdue():
+            log.info("Overdue flush detected at startup — running now")
+            run()
     else:
         log.info("Schedule disabled — manual flush only")
 
