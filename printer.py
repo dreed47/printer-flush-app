@@ -272,6 +272,8 @@ def _is_overdue() -> bool:
     """Return True if a flush is overdue based on last_print.json."""
     import json
     from datetime import timedelta
+    if RUN_INTERVAL_DAYS <= 0:
+        return False  # manual or disabled — never consider overdue
     try:
         if STATE_FILE.exists():
             raw = json.loads(STATE_FILE.read_text()).get("last_print")
@@ -281,6 +283,16 @@ def _is_overdue() -> bool:
     except Exception:
         pass
     return True  # never printed — run now
+
+
+def _maybe_run():
+    """Periodic check: run a flush only if overdue and not already running."""
+    if not _run_lock.locked() and _is_overdue():
+        log.info("Overdue flush detected — running now")
+        def _do():
+            with _run_lock:
+                run()
+        threading.Thread(target=_do, daemon=True).start()
 
 
 # ── Main run ──────────────────────────────────────────────────────────────────
@@ -470,11 +482,9 @@ def _set_config():
             schedule.every(10).minutes.do(run)
             log.info("Schedule updated — flushing every 10 minutes (test mode)")
         elif val > 0:
-            schedule.every(val).days.do(run)
+            schedule.every(5).minutes.do(_maybe_run)
             log.info(f"Schedule updated — flushing every {val} day(s)")
-            if _is_overdue():
-                log.info("Overdue flush detected after config change — running now")
-                threading.Thread(target=run, daemon=True).start()
+            _maybe_run()  # immediate overdue check after config change
         else:
             log.info("Schedule cleared — manual only")
     return jsonify({"run_interval_days": RUN_INTERVAL_DAYS})
@@ -502,11 +512,9 @@ if __name__ == "__main__":
         log.info("Scheduling flush every 10 minutes (test mode)")
         schedule.every(10).minutes.do(run)
     elif RUN_INTERVAL_DAYS > 0:
-        log.info(f"Scheduling flush every {RUN_INTERVAL_DAYS} day(s)")
-        schedule.every(RUN_INTERVAL_DAYS).days.do(run)
-        if _is_overdue():
-            log.info("Overdue flush detected at startup — running now")
-            run()
+        log.info(f"Scheduling overdue check every 5 minutes (interval: {RUN_INTERVAL_DAYS} day(s))")
+        schedule.every(5).minutes.do(_maybe_run)
+        _maybe_run()  # immediate overdue check at startup
     else:
         log.info("Schedule disabled — manual flush only")
 
