@@ -6,8 +6,8 @@ No CUPS required — prints directly over the network.
 """
 
 import io
+import json
 import os
-import re
 import socket
 import struct
 import subprocess
@@ -48,11 +48,31 @@ PRINTER_IP       = os.environ.get("PRINTER_IP", "192.168.86.99")
 PRINTER_PORT     = int(os.getenv("PRINTER_PORT", "631"))
 PRINTER_PATH     = os.getenv("PRINTER_PATH", "/ipp/print")
 FLUSH_PDF        = os.getenv("FLUSH_PDF", "/data/printer-color-flush.pdf")
-RUN_INTERVAL_DAYS= int(os.getenv("RUN_INTERVAL_DAYS", "10"))
-ENV_FILE         = os.getenv("ENV_FILE", "/app/.env")
+_DEFAULT_INTERVAL= int(os.getenv("RUN_INTERVAL_DAYS", "10"))
 STATE_FILE       = Path(os.getenv("STATE_FILE", "/data/last_print.json"))
+CONFIG_FILE      = Path(os.getenv("CONFIG_FILE", "/data/config.json"))
 WEB_PORT         = int(os.getenv("PORT", "7841"))
 TAGLINE          = os.getenv("TAGLINE", "Keeping your nozzles wet since the dawn of inkjet.")
+
+# ── Runtime config (persisted to /data/config.json, falls back to .env defaults) ──
+def _load_runtime_config() -> dict:
+    try:
+        if CONFIG_FILE.exists():
+            return json.loads(CONFIG_FILE.read_text())
+    except Exception:
+        pass
+    return {}
+
+def _save_runtime_config(data: dict):
+    try:
+        existing = _load_runtime_config()
+        existing.update(data)
+        CONFIG_FILE.write_text(json.dumps(existing, indent=2))
+    except Exception as e:
+        log.warning(f"Could not save runtime config: {e}")
+
+_runtime_cfg = _load_runtime_config()
+RUN_INTERVAL_DAYS = _runtime_cfg.get("run_interval_days", _DEFAULT_INTERVAL)
 
 PRINTER_URI = f"ipp://{PRINTER_IP}:{PRINTER_PORT}{PRINTER_PATH}"
 PRINTER_URL = f"http://{PRINTER_IP}:{PRINTER_PORT}{PRINTER_PATH}"
@@ -256,7 +276,6 @@ def _load_last_print() -> str:
     try:
         if STATE_FILE.exists():
             data = STATE_FILE.read_text()
-            import json
             raw = json.loads(data).get("last_print", "Never")
             if raw and raw != "Never":
                 dt = datetime.strptime(raw, "%Y-%m-%d %H:%M:%S")
@@ -270,7 +289,6 @@ def _load_last_print() -> str:
 # ── Overdue check ────────────────────────────────────────────────────────────
 def _is_overdue() -> bool:
     """Return True if a flush is overdue based on last_print.json."""
-    import json
     from datetime import timedelta
     if RUN_INTERVAL_DAYS <= 0:
         return False  # manual or disabled — never consider overdue
@@ -454,21 +472,6 @@ def _logs():
 def _get_config():
     return jsonify({"run_interval_days": RUN_INTERVAL_DAYS})
 
-def _update_env_file(key: str, value: str):
-    p = Path(ENV_FILE)
-    if not p.exists():
-        return
-    lines = p.read_text().splitlines(keepends=True)
-    found = False
-    for i, line in enumerate(lines):
-        if re.match(rf"^{key}\s*=", line):
-            lines[i] = f"{key}={value}\n"
-            found = True
-            break
-    if not found:
-        lines.append(f"{key}={value}\n")
-    p.write_text("".join(lines))
-
 @_web_app.route("/config", methods=["POST"])
 def _set_config():
     global RUN_INTERVAL_DAYS
@@ -476,7 +479,7 @@ def _set_config():
     if "run_interval_days" in data:
         val = int(data["run_interval_days"])
         RUN_INTERVAL_DAYS = val
-        _update_env_file("RUN_INTERVAL_DAYS", str(val))
+        _save_runtime_config({"run_interval_days": val})
         schedule.clear()
         if val == -10:
             schedule.every(10).minutes.do(run)

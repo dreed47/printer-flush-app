@@ -5,8 +5,7 @@ services:
     restart: unless-stopped
     env_file: .env
     volumes:
-      - ./data:/data          # flush PDF + last_print.json state
-      - ./.env:/app/.env      # writable so web UI can persist interval changes
+      - ./data:/data          # flush PDF + last_print.json + config.json state
     ports:
       - "${PORT:-7841}:5000"  # web UI
     logging:
