@@ -515,7 +515,7 @@ if __name__ == "__main__":
         log.info("Scheduling flush every 10 minutes (test mode)")
         schedule.every(10).minutes.do(run)
     elif RUN_INTERVAL_DAYS > 0:
-        log.info(f"Scheduling overdue check every 5 minutes (interval: {RUN_INTERVAL_DAYS} day(s))")
+        log.info(f"Started: check every 5 min, flush when >{RUN_INTERVAL_DAYS}d since last print")
         schedule.every(5).minutes.do(_maybe_run)
         _maybe_run()  # immediate overdue check at startup
     else:
